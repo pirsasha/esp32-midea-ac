@@ -1,0 +1,11 @@
+build/
+managed_components/
+esp-zigbee-sdk/
+sdkconfig.old
+*.elf
+*.map
+*.log
+*.tmp
+.vscode/
+.idea/
+
