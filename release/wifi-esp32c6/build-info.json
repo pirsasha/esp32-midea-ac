@@ -1,0 +1,30 @@
+{
+  "project": "PirogovX AC Wi-Fi Module",
+  "version": "0.1.0-mvp",
+  "chip": "esp32c6",
+  "flash_mode": "dio",
+  "flash_freq": "80m",
+  "flash_size": "4MB",
+  "parts": [
+    {
+      "name": "bootloader.bin",
+      "offset": "0x0",
+      "sha256": "1D0A7F48290C6E3044CDEFE7A95367FE432D761D934786AE9676FC5339CA37C3"
+    },
+    {
+      "name": "partition-table.bin",
+      "offset": "0x8000",
+      "sha256": "5C29260383760733482FB1F2C7DD79DF0A99080B6BBEA8AB68812D01B53E71C2"
+    },
+    {
+      "name": "ota_data_initial.bin",
+      "offset": "0xf000",
+      "sha256": "7D2C7AC4888BFD75CD5F56E8D61F69595121183AFC81556C876732FD3782C62F"
+    },
+    {
+      "name": "ac_wifi_module.bin",
+      "offset": "0x20000",
+      "sha256": "922DEE039401EAA7585B07E26228DE63EA89CEDDC3B42A10D82299B331D777A2"
+    }
+  ]
+}
