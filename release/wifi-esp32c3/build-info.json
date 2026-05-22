@@ -1,0 +1,32 @@
+﻿{
+    "project":  "PirogovX AC Wi-Fi Module ESP32-C3",
+    "version":  "0.1.1-c3-usb-console-test",
+    "chip":  "esp32c3",
+    "uart":  "TX GPIO20 / RX GPIO21",
+    "console":  "USB Serial/JTAG; UART0 disabled to free GPIO20/GPIO21",
+    "flash_mode":  "dio",
+    "flash_freq":  "80m",
+    "flash_size":  "4MB",
+    "parts":  [
+                  {
+                      "name":  "bootloader.bin",
+                      "offset":  "0x0",
+                      "sha256":  "D965ECEFD242104D0A6CBB330D64477E213827268F18E2BD2B2FDCEADD03732B"
+                  },
+                  {
+                      "name":  "partition-table.bin",
+                      "offset":  "0x8000",
+                      "sha256":  "5C29260383760733482FB1F2C7DD79DF0A99080B6BBEA8AB68812D01B53E71C2"
+                  },
+                  {
+                      "name":  "ota_data_initial.bin",
+                      "offset":  "0xf000",
+                      "sha256":  "7D2C7AC4888BFD75CD5F56E8D61F69595121183AFC81556C876732FD3782C62F"
+                  },
+                  {
+                      "name":  "ac_wifi_module.bin",
+                      "offset":  "0x20000",
+                      "sha256":  "6C1BF0749E4909898EA6208A25DADD38388C31C46EE2F35E5E05EA2D34F04697"
+                  }
+              ]
+}

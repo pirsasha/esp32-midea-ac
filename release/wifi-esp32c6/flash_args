@@ -1,0 +1,5 @@
+--flash-mode dio --flash-freq 80m --flash-size 4MB
+0x0 bootloader.bin
+0x8000 partition-table.bin
+0xf000 ota_data_initial.bin
+0x20000 ac_wifi_module.bin
