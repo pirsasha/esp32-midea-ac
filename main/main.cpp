@@ -4,6 +4,8 @@
 #include "driver/gpio.h"
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -25,7 +27,19 @@ static const char *TAG = "ZB_AC";
 
 static constexpr gpio_num_t UART_TX_GPIO = GPIO_NUM_5;
 static constexpr gpio_num_t UART_RX_GPIO = GPIO_NUM_8;
+static constexpr gpio_num_t FACTORY_RESET_GPIO = GPIO_NUM_9;
 static constexpr uint8_t ZIGBEE_ENDPOINT = 1;
+static constexpr int64_t FACTORY_RESET_HOLD_MS = 5000;
+
+// Zigbee OTA (обновление по воздуху через Z2M). manufacturer/image_type должны
+// совпадать с .ota-файлом в OTA-индексе Z2M; обновление предлагается, если версия
+// файла > текущей firmware_version. image_type уникален на чип (H2 != C6).
+static constexpr uint16_t OTA_MANUFACTURER       = 0x1289;
+static constexpr uint16_t OTA_IMAGE_TYPE         = 0xB201;  // ESP32-H2 (в C6-прошивке 0xC601)
+static constexpr uint16_t OTA_HW_VERSION         = 0x0101;
+static constexpr uint8_t  OTA_MAX_DATA_SIZE      = 223;
+static constexpr int      OTA_ELEMENT_HEADER_LEN = 6;
+static constexpr int      OTA_QUERY_INTERVAL_MIN = 60;      // как часто спрашивать сервер (мин)
 
 static constexpr uint16_t ATTR_AC_POWER_ID          = 0xF000;
 static constexpr uint16_t ATTR_AC_MODE_ID           = 0xF001;
@@ -73,16 +87,30 @@ static int16_t thermostat_local_temp = 2200;
 static int16_t thermostat_outdoor_temp = 0;
 static int16_t thermostat_cooling_setpoint = 2200;
 static int16_t thermostat_heating_setpoint = 2200;
+static int16_t thermostat_min_heat_setpoint = 1600;
+static int16_t thermostat_max_heat_setpoint = 3000;
+static int16_t thermostat_min_cool_setpoint = 1600;
+static int16_t thermostat_max_cool_setpoint = 3000;
 static uint8_t thermostat_control_sequence = ESP_ZB_ZCL_THERMOSTAT_CONTROL_SEQ_OF_OPERATION_COOLING_AND_HEATING_4_PIPES;
 static uint8_t thermostat_system_mode = ESP_ZB_ZCL_THERMOSTAT_SYSTEM_MODE_OFF;
 static uint8_t thermostat_running_mode = 0x00;
 static uint8_t thermostat_ac_type = 0x04;
 static uint8_t thermostat_louver_position = ESP_ZB_ZCL_THERMOSTAT_LOUVER_FULLY_CLOSED;
-static uint32_t firmware_version = 0x00010000;
+static uint32_t firmware_version = 0x00010B00;  // 0.1.11 — PirogovX ID + Router + factory reset + Zigbee OTA
 
 static int16_t celsius_to_zcl(float celsius)
 {
     return (int16_t)(celsius * 100.0f);
+}
+
+static float normalize_target_temp(float celsius)
+{
+    if (celsius < 16.0f) {
+        celsius = 16.0f;
+    } else if (celsius > 30.0f) {
+        celsius = 30.0f;
+    }
+    return (float)((int)(celsius + 0.5f));
 }
 
 static uint8_t midea_mode_to_ac_mode(midea::Mode mode, bool power_on)
@@ -269,9 +297,10 @@ static void apply_mode(uint8_t mode)
 {
     ac_mode = mode;
     ac_power = mode != AC_MODE_OFF;
-    midea::set_power(ac_power);
     if (ac_power) {
         midea::set_mode(ac_mode_to_midea(mode));
+    } else {
+        midea::set_power(false);
     }
 }
 
@@ -309,7 +338,11 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
             break;
         case ESP_ZB_ZCL_ATTR_THERMOSTAT_OCCUPIED_COOLING_SETPOINT_ID:
         case ESP_ZB_ZCL_ATTR_THERMOSTAT_OCCUPIED_HEATING_SETPOINT_ID:
-            ac_target_temp = (float)attr_i16(message) / 100.0f;
+            ac_target_temp = normalize_target_temp((float)attr_i16(message) / 100.0f);
+            ac_power = true;
+            if (ac_mode == AC_MODE_OFF) {
+                ac_mode = AC_MODE_COOL;
+            }
             midea::set_target_temp(ac_target_temp);
             break;
         case ESP_ZB_ZCL_ATTR_THERMOSTAT_AC_LOUVER_POSITION_ID:
@@ -347,7 +380,11 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
         midea::toggle_display();
         break;
     case ATTR_AC_TARGET_TEMP_ID:
-        ac_target_temp = attr_single(message);
+        ac_target_temp = normalize_target_temp(attr_single(message));
+        ac_power = true;
+        if (ac_mode == AC_MODE_OFF) {
+            ac_mode = AC_MODE_COOL;
+        }
         midea::set_target_temp(ac_target_temp);
         break;
     default:
@@ -358,12 +395,144 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
     return ESP_OK;
 }
 
-static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
+// ---- Zigbee OTA client ----
+static const esp_partition_t *s_ota_partition = nullptr;
+static esp_ota_handle_t s_ota_handle = 0;
+static bool s_ota_tagid_received = false;
+
+// Снимает служебный заголовок OTA-суб-элемента с первого блока, дальше отдаёт сырые
+// данные образа приложения для записи в OTA-раздел.
+static esp_err_t ota_extract_element(uint32_t total_size, const void *payload, uint16_t payload_size,
+                                     void **outbuf, uint16_t *outlen)
 {
-    if (callback_id == ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID) {
-        return zb_attribute_handler((const esp_zb_zcl_set_attr_value_message_t *)message);
+    static uint16_t tagid = 0;
+    if (!s_ota_tagid_received) {
+        if (!payload || payload_size <= OTA_ELEMENT_HEADER_LEN) {
+            ESP_RETURN_ON_ERROR(ESP_ERR_INVALID_ARG, TAG, "Invalid OTA element format");
+        }
+        tagid = *(const uint16_t *)payload;
+        uint32_t length = *(const uint32_t *)((const uint8_t *)payload + sizeof(tagid));
+        if ((length + OTA_ELEMENT_HEADER_LEN) != total_size) {
+            ESP_RETURN_ON_ERROR(ESP_ERR_INVALID_ARG, TAG, "Invalid OTA element length [%lu/%lu]",
+                                (unsigned long)length, (unsigned long)total_size);
+        }
+        s_ota_tagid_received = true;
+        *outbuf = (void *)((const uint8_t *)payload + OTA_ELEMENT_HEADER_LEN);
+        *outlen = payload_size - OTA_ELEMENT_HEADER_LEN;
+    } else {
+        *outbuf = (void *)payload;
+        *outlen = payload_size;
+    }
+    if (tagid != 0 /* UPGRADE_IMAGE */) {
+        ESP_RETURN_ON_ERROR(ESP_ERR_INVALID_ARG, TAG, "Unsupported OTA element tag %u", tagid);
     }
     return ESP_OK;
+}
+
+static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message)
+{
+    static uint32_t total_size = 0;
+    static uint32_t offset = 0;
+    esp_err_t ret = ESP_OK;
+    if (message.info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
+        return ESP_OK;
+    }
+    switch (message.upgrade_status) {
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
+        ESP_LOGI(TAG, "OTA start");
+        s_ota_tagid_received = false;
+        offset = 0;
+        s_ota_partition = esp_ota_get_next_update_partition(nullptr);
+        ESP_RETURN_ON_FALSE(s_ota_partition, ESP_ERR_NOT_FOUND, TAG, "No OTA partition");
+        ret = esp_ota_begin(s_ota_partition, OTA_SIZE_UNKNOWN, &s_ota_handle);
+        ESP_RETURN_ON_ERROR(ret, TAG, "esp_ota_begin failed: %s", esp_err_to_name(ret));
+        break;
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_RECEIVE:
+        total_size = message.ota_header.image_size;
+        offset += message.payload_size;
+        if (message.payload_size && message.payload) {
+            uint16_t out_len = 0;
+            void *out_buf = nullptr;
+            ret = ota_extract_element(total_size, message.payload, message.payload_size, &out_buf, &out_len);
+            ESP_RETURN_ON_ERROR(ret, TAG, "OTA element parse failed");
+            if (out_len) {
+                ret = esp_ota_write(s_ota_handle, out_buf, out_len);
+                ESP_RETURN_ON_ERROR(ret, TAG, "esp_ota_write failed: %s", esp_err_to_name(ret));
+            }
+        }
+        break;
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_APPLY:
+        ESP_LOGI(TAG, "OTA apply");
+        break;
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_CHECK:
+        ret = (offset == total_size) ? ESP_OK : ESP_FAIL;
+        ESP_LOGI(TAG, "OTA check [%lu/%lu]: %s", (unsigned long)offset, (unsigned long)total_size, esp_err_to_name(ret));
+        offset = 0;
+        total_size = 0;
+        s_ota_tagid_received = false;
+        break;
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_FINISH:
+        ESP_LOGW(TAG, "OTA finished, applying and rebooting");
+        ret = esp_ota_end(s_ota_handle);
+        ESP_RETURN_ON_ERROR(ret, TAG, "esp_ota_end failed: %s", esp_err_to_name(ret));
+        ret = esp_ota_set_boot_partition(s_ota_partition);
+        ESP_RETURN_ON_ERROR(ret, TAG, "set_boot_partition failed: %s", esp_err_to_name(ret));
+        esp_restart();
+        break;
+    default:
+        break;
+    }
+    return ret;
+}
+
+static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message)
+{
+    switch (callback_id) {
+    case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
+        return zb_attribute_handler((const esp_zb_zcl_set_attr_value_message_t *)message);
+    case ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID:
+        return zb_ota_upgrade_status_handler(*(const esp_zb_zcl_ota_upgrade_value_message_t *)message);
+    default:
+        break;
+    }
+    return ESP_OK;
+}
+
+static void factory_reset_button_task(void *)
+{
+    gpio_config_t io = {};
+    io.pin_bit_mask = 1ULL << FACTORY_RESET_GPIO;
+    io.mode = GPIO_MODE_INPUT;
+    io.pull_up_en = GPIO_PULLUP_ENABLE;
+    io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(&io);
+
+    int64_t pressed_since = 0;
+    bool reset_done = false;
+
+    while (true) {
+        bool pressed = gpio_get_level(FACTORY_RESET_GPIO) == 0;
+        int64_t now_ms = esp_log_timestamp();
+
+        if (pressed) {
+            if (pressed_since == 0) {
+                pressed_since = now_ms;
+            } else if (!reset_done && now_ms - pressed_since >= FACTORY_RESET_HOLD_MS) {
+                reset_done = true;
+                ESP_LOGW(TAG, "Factory reset requested by BOOT button");
+                // Zigbee-данные (сеть, биндинги) лежат в разделе zb_storage, а не
+                // в основном nvs — стираем именно Zigbee-NVRAM: устройство покидает
+                // сеть и перезагружается готовым к новому спариванию.
+                esp_zb_factory_reset();
+            }
+        } else {
+            pressed_since = 0;
+            reset_done = false;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
 }
 
 extern "C" void app_main(void)
@@ -374,6 +543,7 @@ extern "C" void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    xTaskCreate(factory_reset_button_task, "factory_reset", 2048, NULL, 5, NULL);
 
     ESP_ERROR_CHECK(midea::init(UART_TX_GPIO, UART_RX_GPIO, on_midea_state));
 
@@ -382,16 +552,18 @@ extern "C" void app_main(void)
     platform_config.host_config.host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE;
     ESP_ERROR_CHECK(esp_zb_platform_config(&platform_config));
 
+    // Router (ZR): модуль питается от кондиционера (mains) — работает роутером,
+    // всегда онлайн, ретранслирует меш и надёжно принимает команды. Не спит.
     esp_zb_cfg_t zb_cfg = {};
-    zb_cfg.esp_zb_role = ESP_ZB_DEVICE_TYPE_ED;
+    zb_cfg.esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER;
     zb_cfg.install_code_policy = false;
-    zb_cfg.nwk_cfg.zed_cfg.ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_64MIN;
-    zb_cfg.nwk_cfg.zed_cfg.keep_alive = 5000;
-    esp_zb_sleep_enable(false);
+    zb_cfg.nwk_cfg.zczr_cfg.max_children = 10;
     esp_zb_init(&zb_cfg);
 
-    static char model_id[] = {8, 'Z', 'i', 'g', 'b', 'e', 'e', 'A', 'c'};
-    static char manuf_name[] = {9, 'E', 's', 'p', 'r', 'e', 's', 's', 'i', 'f'};
+    // Единый fingerprint с C6 — один конвертер/определение Z2M на оба чипа.
+    // Первый байт — длина Zigbee-строки. "ZB-MIDEA-AC"=11, "PirogovX"=8.
+    static char model_id[] = {11, 'Z', 'B', '-', 'M', 'I', 'D', 'E', 'A', '-', 'A', 'C'};
+    static char manuf_name[] = {8, 'P', 'i', 'r', 'o', 'g', 'o', 'v', 'X'};
 
     esp_zb_basic_cluster_cfg_t basic_cfg = {};
     basic_cfg.zcl_version = 3;
@@ -407,6 +579,14 @@ extern "C" void app_main(void)
     therm_cfg.control_sequence_of_operation = thermostat_control_sequence;
     therm_cfg.system_mode = thermostat_system_mode;
     esp_zb_attribute_list_t *therm_attr = esp_zb_thermostat_cluster_create(&therm_cfg);
+    ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_MIN_HEAT_SETPOINT_LIMIT_ID,
+                                                       &thermostat_min_heat_setpoint));
+    ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_MAX_HEAT_SETPOINT_LIMIT_ID,
+                                                       &thermostat_max_heat_setpoint));
+    ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_MIN_COOL_SETPOINT_LIMIT_ID,
+                                                       &thermostat_min_cool_setpoint));
+    ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_MAX_COOL_SETPOINT_LIMIT_ID,
+                                                       &thermostat_max_cool_setpoint));
     ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_OUTDOOR_TEMPERATURE_ID,
                                                        &thermostat_outdoor_temp));
     ESP_ERROR_CHECK(esp_zb_thermostat_cluster_add_attr(therm_attr, ESP_ZB_ZCL_ATTR_THERMOSTAT_RUNNING_MODE_ID,
@@ -443,10 +623,28 @@ extern "C" void app_main(void)
     ESP_ERROR_CHECK(esp_zb_cluster_add_attr(analog_attr, ESP_ZB_ZCL_CLUSTER_ID_ANALOG_INPUT, ATTR_AC_FW_VERSION_ID,
                                             ESP_ZB_ZCL_ATTR_TYPE_U32, ro, &firmware_version));
 
+    // OTA client cluster — обновление прошивки по воздуху через Z2M.
+    esp_zb_ota_cluster_cfg_t ota_cfg = {};
+    ota_cfg.ota_upgrade_file_version = firmware_version;
+    ota_cfg.ota_upgrade_downloaded_file_ver = firmware_version;
+    ota_cfg.ota_upgrade_manufacturer = OTA_MANUFACTURER;
+    ota_cfg.ota_upgrade_image_type = OTA_IMAGE_TYPE;
+    esp_zb_attribute_list_t *ota_attr = esp_zb_ota_cluster_create(&ota_cfg);
+    esp_zb_zcl_ota_upgrade_client_variable_t ota_var = {};
+    ota_var.timer_query = ESP_ZB_ZCL_OTA_UPGRADE_QUERY_TIMER_COUNT_DEF;
+    ota_var.hw_version = OTA_HW_VERSION;
+    ota_var.max_data_size = OTA_MAX_DATA_SIZE;
+    uint16_t ota_server_addr = 0xffff;
+    uint8_t ota_server_ep = 0xff;
+    ESP_ERROR_CHECK(esp_zb_ota_cluster_add_attr(ota_attr, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID, &ota_var));
+    ESP_ERROR_CHECK(esp_zb_ota_cluster_add_attr(ota_attr, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID, &ota_server_addr));
+    ESP_ERROR_CHECK(esp_zb_ota_cluster_add_attr(ota_attr, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID, &ota_server_ep));
+
     esp_zb_cluster_list_t *clusters = esp_zb_zcl_cluster_list_create();
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_basic_cluster(clusters, basic_attr, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_thermostat_cluster(clusters, therm_attr, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_analog_input_cluster(clusters, analog_attr, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE));
+    ESP_ERROR_CHECK(esp_zb_cluster_list_add_ota_cluster(clusters, ota_attr, ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE));
 
     esp_zb_endpoint_config_t ep_config = {};
     ep_config.endpoint = ZIGBEE_ENDPOINT;
@@ -465,6 +663,32 @@ extern "C" void app_main(void)
     }
 }
 
+// Нашли OTA-сервер (координатор) — включаем периодический опрос и запрашиваем образ.
+static void ota_match_server_cb(esp_zb_zdp_status_t zdo_status, uint16_t addr, uint8_t endpoint, void *)
+{
+    if (zdo_status == ESP_ZB_ZDP_STATUS_SUCCESS) {
+        ESP_LOGI(TAG, "OTA server found (addr 0x%04x ep %d)", addr, endpoint);
+        esp_zb_ota_upgrade_client_query_interval_set(ZIGBEE_ENDPOINT, OTA_QUERY_INTERVAL_MIN);
+        esp_zb_ota_upgrade_client_query_image_req(addr, endpoint);
+    } else {
+        ESP_LOGW(TAG, "OTA server not found");
+    }
+}
+
+// Ищем на координаторе кластер OTA Upgrade, чтобы устройство знало, куда слать запросы.
+static void ota_find_server(void)
+{
+    static uint16_t ota_cluster = ESP_ZB_ZCL_CLUSTER_ID_OTA_UPGRADE;
+    esp_zb_zdo_match_desc_req_param_t req = {};
+    req.addr_of_interest = 0x0000;
+    req.dst_nwk_addr = 0x0000;
+    req.profile_id = ESP_ZB_AF_HA_PROFILE_ID;
+    req.num_in_clusters = 0;
+    req.num_out_clusters = 1;
+    req.cluster_list = &ota_cluster;
+    esp_zb_zdo_match_cluster(&req, ota_match_server_cb, nullptr);
+}
+
 extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
 {
     esp_zb_app_signal_type_t sig_type = (esp_zb_app_signal_type_t)*(signal_struct->p_app_signal);
@@ -480,6 +704,7 @@ extern "C" void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         if (err_status == ESP_OK) {
             ESP_LOGI(TAG, "Joined Zigbee network");
             midea::request_status();
+            ota_find_server();
         }
         break;
     default:

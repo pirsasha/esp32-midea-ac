@@ -186,13 +186,18 @@ const toZigbee = {
 };
 
 module.exports = {
+    // Уникальный fingerprint (прошивка PirogovX >= 0.1.8: manufacturerName=PirogovX,
+    // modelID=ZB-MIDEA-AC). Старый generic Espressif/ZigbeeAc оставлен для
+    // совместимости с уже спаренными модулями на прежней прошивке — при отправке
+    // в официальный zigbee-herdsman-converters эти generic-строки надо УБРАТЬ,
+    // оставить только {modelID:'ZB-MIDEA-AC', manufacturerName:'PirogovX'}.
     fingerprint: [
+        {modelID: 'ZB-MIDEA-AC', manufacturerName: 'PirogovX'},
         {modelID: 'ZigbeeAc', manufacturerName: 'Espressif'},
-        {modelID: 'GasMeter1', manufacturerName: 'Espressif'},
     ],
     model: 'ZB-MIDEA-AC',
-    vendor: 'Custom',
-    description: 'Zigbee air conditioner Royal Clima/Midea on ESP32-H2',
+    vendor: 'PirogovX',
+    description: 'Zigbee air conditioner Royal Clima / Midea / Hommyn (ESP32-H2/C6)',
     fromZigbee: [fromZigbeeAcAnalog, fromZigbeeThermostat],
     toZigbee: [
         toZigbee.state,
@@ -205,7 +210,7 @@ module.exports = {
     ],
     exposes: [
         e.climate()
-            .withSetpoint('occupied_heating_setpoint', 16, 30, 0.5, ea.STATE_SET)
+            .withSetpoint('occupied_heating_setpoint', 16, 30, 1, ea.STATE_SET)
             .withLocalTemperature()
             .withSystemMode(['off', 'auto', 'cool', 'heat', 'dry', 'fan_only'], ea.STATE_SET),
         e.enum('fan_mode', ea.STATE_SET, ['auto', 'low', 'medium', 'high', 'quiet']).withDescription('Fan speed'),
@@ -215,5 +220,17 @@ module.exports = {
         e.numeric('outdoor_temperature', ea.STATE).withUnit('C').withDescription('Outdoor unit temperature'),
         e.numeric('firmware_version', ea.STATE).withDescription('Firmware version'),
     ],
-    configure: async () => {},
+    configure: async (device, coordinatorEndpoint) => {
+        // Привязываем кластеры к координатору, чтобы устройство само слало отчёты
+        // (текущая/наружная температура, режим, fw). Без этого binding Z2M не
+        // получает значения. Делается автоматически при спаривании — вручную
+        // на вкладке «Связи» больше не нужно.
+        const endpoint = device.getEndpoint(1);
+        await endpoint.bind('genAnalogInput', coordinatorEndpoint);
+        try {
+            await endpoint.bind('hvacThermostat', coordinatorEndpoint);
+        } catch (e) {
+            // hvacThermostat может не биндиться на некоторых координаторах — не критично
+        }
+    },
 };

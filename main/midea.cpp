@@ -96,6 +96,13 @@ static std::atomic<uint8_t> g_msg_id{0};
 // Простая очередь TX-кадров: задача-опросчик читает её и пишет в UART.
 static QueueHandle_t    g_tx_queue     = nullptr;
 
+static const uint8_t kWifiPresenceInitFrame[] = {
+    0xAA, 0x1E, 0xAC, 0xB2, 0x00, 0x00, 0x00, 0x00,
+    0x03, 0x0D, 0x01, 0x01, 0x04, 0x45, 0x02, 0xA8,
+    0xC0, 0xFF, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00,
+    0x09, 0x00, 0x02, 0x00, 0x00, 0x00, 0xB2,
+};
+
 static void log_hex(const char *prefix, const uint8_t *data, size_t len) {
     char line[3 * 64 + 1];
     size_t pos = 0;
@@ -132,8 +139,22 @@ struct TxItem {
 //   ...
 // Поля, которые здесь не разбираются, можно дополнить по логам реальных кадров.
 
+static bool decode_midea_temp(uint8_t raw, float *out) {
+    if (raw == 0x00 || raw == 0xFF) {
+        return false;
+    }
+
+    float value = ((float)raw - 50.0f) / 2.0f;
+    if (value < -40.0f || value > 80.0f) {
+        return false;
+    }
+
+    *out = value;
+    return true;
+}
+
 static void parse_status(const uint8_t *p, size_t plen) {
-    if (plen < 13) {
+    if (plen < 13 || (p[0] != 0xC0 && p[0] != 0xA0)) {
         ESP_LOGW(TAG, "status too short: %u", (unsigned)plen);
         return;
     }
@@ -158,7 +179,7 @@ static void parse_status(const uint8_t *p, size_t plen) {
 
     // Скорость вентилятора
     uint8_t fan_byte = p[3];
-    if      (fan_byte >= 100) st.fan = FanSpeed::Auto;
+    if      (fan_byte >= 102) st.fan = FanSpeed::Auto;
     else if (fan_byte >= 70)  st.fan = FanSpeed::High;
     else if (fan_byte >= 50)  st.fan = FanSpeed::Medium;
     else if (fan_byte >= 30)  st.fan = FanSpeed::Low;
@@ -169,16 +190,17 @@ static void parse_status(const uint8_t *p, size_t plen) {
 
     if (plen > 10) {
         st.eco   = (p[9] & (0x80 | 0x10)) != 0;
-        st.turbo = ((p[8] & 0x20) != 0) || ((p[10] & 0x02) != 0);
-        st.sleep = (p[10] & 0x01) != 0;
+        st.turbo = (p[10] & 0x20) != 0;
+        st.sleep = (p[8] & 0x03) != 0;
     }
 
     // Температуры — формула из msmart: T = (raw - 50) / 2  °C
-    if (plen > 11 && p[11] != 0xFF) {
-        st.indoor_temp  = ((float)p[11] - 50.0f) / 2.0f;
+    float temp = 0.0f;
+    if (plen > 11 && decode_midea_temp(p[11], &temp)) {
+        st.indoor_temp = temp;
     }
-    if (plen > 12 && p[12] != 0xFF) {
-        st.outdoor_temp = ((float)p[12] - 50.0f) / 2.0f;
+    if (plen > 12 && decode_midea_temp(p[12], &temp)) {
+        st.outdoor_temp = temp;
     }
 
     // Сохраняем в shadow и уведомляем
@@ -279,13 +301,26 @@ static size_t build_set_frame(uint8_t *out, const SetOverride &ov) {
 
     switch (ov.field) {
         case SetOverride::Field::Power: st.power_on = ov.b_value;    break;
-        case SetOverride::Field::Mode:  st.mode     = ov.mode_value; break;
-        case SetOverride::Field::Temp:  st.set_temp = ov.temp_value; break;
-        case SetOverride::Field::Fan:   st.fan      = ov.fan_value;  break;
+        case SetOverride::Field::Mode:
+            st.power_on = true;
+            st.mode     = ov.mode_value;
+            break;
+        case SetOverride::Field::Temp:
+            st.power_on = true;
+            st.set_temp = ov.temp_value;
+            break;
+        case SetOverride::Field::Fan:
+            st.power_on = true;
+            st.fan      = ov.fan_value;
+            st.sleep    = false;
+            st.turbo    = false;
+            st.eco      = false;
+            break;
         case SetOverride::Field::Eco:    st.eco      = ov.b_value;    break;
         case SetOverride::Field::Turbo:  st.turbo    = ov.b_value;    break;
         case SetOverride::Field::Sleep:  st.sleep    = ov.b_value;    break;
         case SetOverride::Field::Preset:
+            st.power_on = true;
             st.sleep = ov.b_value;
             st.turbo = ov.b2_value;
             st.eco = false;
@@ -301,8 +336,8 @@ static size_t build_set_frame(uint8_t *out, const SetOverride &ov) {
     // Кодируем температуру: целая часть 16..30 → биты 0..3, половинка → бит 4
     if (st.set_temp < 16.0f) st.set_temp = 16.0f;
     if (st.set_temp > 30.0f) st.set_temp = 30.0f;
-    uint8_t temp_int  = (uint8_t)st.set_temp;
-    bool    temp_half = (st.set_temp - (float)temp_int) >= 0.25f;
+    uint8_t temp_int  = (uint8_t)(st.set_temp + 0.5f);
+    bool    temp_half = false;
 
     uint8_t body[25] = {};
     body[0]  = 0x40;
@@ -318,10 +353,16 @@ static size_t build_set_frame(uint8_t *out, const SetOverride &ov) {
     body[7]  = 0x30
              | (st.swing_v ? 0x0C : 0x00)
              | (st.swing_h ? 0x03 : 0x00);
-    body[8]  = (st.turbo ? 0x20 : 0x00);
+    body[8]  = 0x00;
     body[9]  = (st.eco ? 0x80 : 0x00);
-    body[10] = (st.turbo ? 0x02 : 0x00)
-             | (st.sleep ? 0x01 : 0x00);
+    body[10] = 0x00;
+    if (st.sleep) {
+        body[3] = 20;
+        body[8] |= 0x01;
+    } else if (st.turbo) {
+        body[3] = 100;
+        body[10] |= 0x20;
+    }
     body[18] = (temp_int >= 12) ? ((temp_int - 12) & 0x1F) : 0;
     // body[9..23] остаются нулями — стандартные значения
     body[24] = g_msg_id.fetch_add(1);                // message id
@@ -437,8 +478,12 @@ static void uart_task(void *) {
     FrameReader reader;
     uint8_t     rx_buf[64];
     TickType_t  next_poll = xTaskGetTickCount() + pdMS_TO_TICKS(1000);
+    TickType_t  next_presence_init = xTaskGetTickCount() + pdMS_TO_TICKS(2000);
+    uint8_t     presence_init_left = 5;
 
     // первичный запрос статуса
+    ESP_LOGI(TAG, "queue WiFi presence init frame");
+    enqueue_frame(kWifiPresenceInitFrame, sizeof(kWifiPresenceInitFrame));
     request_status();
 
     while (true) {
@@ -458,6 +503,13 @@ static void uart_task(void *) {
         }
 
         // периодический опрос
+        if (presence_init_left > 0 && (int)(xTaskGetTickCount() - next_presence_init) >= 0) {
+            ESP_LOGI(TAG, "queue delayed WiFi presence init frame, left=%u", (unsigned)(presence_init_left - 1));
+            enqueue_frame(kWifiPresenceInitFrame, sizeof(kWifiPresenceInitFrame));
+            presence_init_left--;
+            next_presence_init += pdMS_TO_TICKS(2000);
+        }
+
         if ((int)(xTaskGetTickCount() - next_poll) >= 0) {
             request_status();
             next_poll += POLL_PERIOD;

@@ -1,0 +1,30 @@
+{
+    "project": "PirogovX AC Zigbee Module ESP32-C6 (Midea/Hommyn)",
+    "version": "0.1.11-c6-ota",
+    "chip": "esp32c6",
+    "flash_mode": "dio",
+    "uart": "TX GPIO7 / RX GPIO6",
+    "transport": "Zigbee (802.15.4 native)",
+    "default_protocol": "zigbee+midea",
+    "converter": "esp-ac.js (Zigbee2MQTT)",
+    "base": "esp32h2_zigbee_ac (порт H2->C6, idf v6.0.1, esp-zigbee 1.6.5)",
+    "notes": "Zigbee Midea/Royal Clima/Hommyn для ESP32-C6 (порт H2, нативное радио 802.15.4). 0.1.7: откат частых report_attr — они флудили sleepy-ZED и ломали управление (ROUTE_ERROR/Delivery failed) + отчёт custom-атрибута валил стек. Поведение как у рабочей H2. Телеметрию (текущая темп.) добавим позже через штатный reporting с интервалами. UART TX7/RX6. Конвертер esp-ac.js: в configure добавлен bind genAnalogInput/hvacThermostat к координатору — телеметрия (текущая/наружная темп., fw) появляется автоматически при спаривании, без ручной привязки на вкладке «Связи». 0.1.8: уникальный Zigbee fingerprint manufacturerName=PirogovX, modelID=ZB-MIDEA-AC (для официального конвертера zigbee-herdsman-converters). 0.1.9: устройство работает как Zigbee ROUTER (CONFIG_ZB_ZCZR=y), а не End Device — питается от кондиционера, всегда онлайн, ретранслирует меш и надёжно принимает команды (у sleepy-ZED были ROUTE_ERROR/Delivery failed). Сон/PM отключены. ВНИМАНИЕ: после прошивки устройство надо удалить из Z2M и спарить заново (сменился тип устройства). 0.1.10: рабочая кнопка factory reset — удержание BOOT (GPIO9) 5с вызывает esp_zb_factory_reset() (покидает сеть + стирает Zigbee-NVRAM zb_storage, было ошибочно nvs_flash_erase, который Zigbee-данные не трогал). 0.1.11: Zigbee OTA — обновление прошивки по воздуху через Z2M (кластер OTA Upgrade client, manufacturerCode=0x1289, imageType=0xC601). .ota-образ в подпапке ota/, добавляется в OTA-индекс Z2M (см. ota/index.json). Прошивка оптимизирована по размеру (-Os), т.к. с OTA впритык к разделу 2MB.",
+    "parts": [
+        {
+            "name": "bootloader.bin",
+            "offset": "0x0"
+        },
+        {
+            "name": "partition-table.bin",
+            "offset": "0x8000"
+        },
+        {
+            "name": "ota_data_initial.bin",
+            "offset": "0xf000"
+        },
+        {
+            "name": "zb_midea_ac.bin",
+            "offset": "0x20000"
+        }
+    ]
+}

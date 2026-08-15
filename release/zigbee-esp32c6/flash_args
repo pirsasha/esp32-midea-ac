@@ -1,4 +1,4 @@
---flash-mode dio --flash-freq 48m --flash-size 2MB
+--flash-mode dio --flash-freq 80m --flash-size 2MB
 0x0 bootloader/bootloader.bin
 0x8000 partition_table/partition-table.bin
 0xf000 ota_data_initial.bin

@@ -1,0 +1,33 @@
+{
+    "project":  "PirogovX AC Zigbee Module ESP32-H2 (Midea/Hommyn)",
+    "version":  "0.1.11-h2-ota",
+    "chip":  "esp32h2",
+    "flash_mode":  "dio",
+    "uart":  "TX GPIO5 / RX GPIO8",
+    "transport":  "Zigbee (802.15.4 native)",
+    "default_protocol":  "zigbee+midea",
+    "converter":  "esp-ac.js (Zigbee2MQTT)",
+    "notes":  "Единый вид с ESP32-C6. Fingerprint PirogovX/ZB-MIDEA-AC (один конвертер и определение Z2M на оба чипа). Zigbee ROUTER (mains, всегда онлайн, ретранслирует меш). Кнопка factory reset: BOOT (GPIO9) 5с -> esp_zb_factory_reset(). 0.1.11: Zigbee OTA — обновление по воздуху через Z2M (кластер OTA Upgrade client, manufacturerCode=0x1289, imageType=0xB201). .ota-образ в ota/, добавляется в OTA-индекс Z2M (firmware/ota-zigbee/index.json). Прошивка с -Os. ВНИМАНИЕ: при обновлении с версий до 0.1.10 удалите устройство из Z2M и спарьте заново (сменились ID и тип). UART TX GPIO5 / RX GPIO8.",
+    "parts":  [
+                  {
+                      "name":  "bootloader.bin",
+                      "offset":  "0x0",
+                      "sha256":  "209560A7F23561C200431F6CAEE9E197E29BEE3CE120B7D9A17637964C24E5DE"
+                  },
+                  {
+                      "name":  "partition-table.bin",
+                      "offset":  "0x8000",
+                      "sha256":  "8D302C89FE2723AFE726F59F1EB926C9BA0C1021B9037D2CFE1B8B080775CA50"
+                  },
+                  {
+                      "name":  "ota_data_initial.bin",
+                      "offset":  "0xf000",
+                      "sha256":  "7D2C7AC4888BFD75CD5F56E8D61F69595121183AFC81556C876732FD3782C62F"
+                  },
+                  {
+                      "name":  "zb_midea_ac.bin",
+                      "offset":  "0x20000",
+                      "sha256":  "A319EB3507BC1B6B8EDF245F3D57F1E05688BC132FC0EDC498D4410358EEC7C6"
+                  }
+              ]
+}
