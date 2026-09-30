@@ -1,0 +1,23 @@
+esp32-midea-ac
+Copyright 2026 Alexander Pirogov
+
+Licensed under the Apache License, Version 2.0.
+
+The Midea UART protocol implementation in this project was developed with
+reference to publicly available open-source work, including:
+
+- midea-msmart, originally by NeoAcheron, Mac_Zhou (@mac-zhou),
+  Colin Kuebler (@kueblc), and contributors.
+  Repository: https://github.com/0xbw/midea-msmart
+  License: MIT.
+
+- MideaUART by Sergey Dudanov and contributors.
+  Repository: https://github.com/dudanov/MideaUART
+  License: MIT (as declared by the project metadata).
+
+See THIRD_PARTY_NOTICES.md for third-party attribution details.
+
+"PirogovX" is a project/product name associated with Alexander Pirogov.
+The Apache License 2.0 does not grant rights to use project names,
+trade names, trademarks, service marks, or product names except as needed
+to describe the origin of the software.
