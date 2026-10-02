@@ -1,12 +1,10 @@
 <div align="center">
 
-<a href="https://pirogovx.ru">
-  <img src="https://raw.githubusercontent.com/pirsasha/pirogovx-android/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="120" alt="PirogovX">
+<a href="https://flash.pirogovx.ru">
+  <img src="https://flash.pirogovx.ru/assets/og-image.png" width="100%" alt="PirogovX - Smart devices. Smarter life.">
 </a>
 
 # PirogovX ESP32 AC Controller
-
-### Smart devices. Smarter life.
 
 Local ESP32 control for air conditioners: UART, Home Assistant, Zigbee2MQTT, MQTT and Matter.
 
