@@ -1,8 +1,11 @@
 <div align="center">
 
 <a href="https://pirogovx.ru">
-  <img src="docs/assets/pirogovx-logo-horizontal-dark.webp#gh-dark-mode-only" width="460" alt="PirogovX">
-  <img src="docs/assets/pirogovx-logo-horizontal.webp#gh-light-mode-only" width="460" alt="PirogovX">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/pirogovx-logo-horizontal-dark.webp">
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/pirogovx-logo-horizontal.webp">
+    <img src="docs/assets/pirogovx-logo-horizontal.webp" width="460" alt="PirogovX">
+  </picture>
 </a>
 
 # PirogovX ESP32 AC Controller
