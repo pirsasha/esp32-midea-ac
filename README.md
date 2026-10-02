@@ -342,6 +342,35 @@ Good candidates include:
 
 For larger features, keeping changes in a focused feature branch and opening a separate pull request for each feature makes review and hardware testing easier.
 
+## Support the project ❤️
+
+If PirogovX has been useful to you, you can support further development, hardware testing, protocol research and compatibility work.
+
+### International crypto support
+
+![USDT TRC20](https://img.shields.io/badge/USDT-TRON%20%2F%20TRC20-26A17B?style=flat-square)
+
+```text
+TU6h4ycD2cALZVTYidQxqigux5ce1swJv6
+```
+
+![USDT TON](https://img.shields.io/badge/USDT-TON-0098EA?style=flat-square)
+
+```text
+UQDhOx70Zg48VI2FzBc_3QvwdwOMXurkzgl8doFUgobpHDdZ
+```
+
+![Bitcoin](https://img.shields.io/badge/Bitcoin-BTC-F7931A?style=flat-square&logo=bitcoin&logoColor=white)
+
+```text
+1Q3koHNsypvvhrpRfSDxFZWAN3nwYRXuHt
+```
+
+> [!IMPORTANT]
+> Always verify the **asset and network** before sending. Crypto transactions are irreversible. These addresses are for voluntary project support only.
+
+Thank you for helping fund new hardware tests, protocol work and open-source development. ❤️
+
 ## Safety
 
 - Never connect the ESP32 directly to mains voltage.
