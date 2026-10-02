@@ -1,17 +1,27 @@
 <div align="center">
 
+<a href="https://pirogovx.ru">
+  <img src="https://raw.githubusercontent.com/pirsasha/pirogovx-android/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp" width="120" alt="PirogovX">
+</a>
+
 # PirogovX ESP32 AC Controller
 
-### Local control for Midea / Midea OEM air conditioners with ESP32
+### Smart devices. Smarter life.
 
-Replace the original Wi-Fi dongle with an ESP32 and control the air conditioner locally through UART, Home Assistant, Zigbee2MQTT, MQTT or Matter.
+Local ESP32 control for air conditioners: UART, Home Assistant, Zigbee2MQTT, MQTT and Matter.
 
-[English](README.md) | [Русский](README_RU.md)
+**English** | [Русский](README_RU.md)
 
 [![Web installer](https://img.shields.io/badge/Web%20installer-flash.pirogovx.ru-2563eb?style=for-the-badge)](https://flash.pirogovx.ru)
 [![License](https://img.shields.io/badge/License-Apache%202.0-0f766e?style=for-the-badge)](LICENSE)
 [![ESP32](https://img.shields.io/badge/ESP32-C3%20%7C%20C6%20%7C%20H2-e11d48?style=for-the-badge)](https://www.espressif.com/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Local%20control-41BDF5?style=for-the-badge)](https://www.home-assistant.io/)
+
+<br>
+
+[![Telegram](https://img.shields.io/badge/Telegram-@pirogovc-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://t.me/pirogovc)
+[![YouTube](https://img.shields.io/badge/YouTube-@pirogovx-FF0000?style=flat-square&logo=youtube&logoColor=white)](https://www.youtube.com/@pirogovx)
+[![Instagram](https://img.shields.io/badge/Instagram-@pirogovx-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/pirogovx/)
 
 </div>
 
