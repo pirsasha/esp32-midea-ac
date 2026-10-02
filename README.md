@@ -36,6 +36,60 @@ Local ESP32 control for air conditioners: UART, Home Assistant, Zigbee2MQTT, MQT
 >
 > Protocol and model support evolves quickly, so the website should be treated as the current compatibility source.
 
+## Compatibility at a glance
+
+### This repository: Midea UART / Midea OEM
+
+<div align="center">
+
+![Midea UART](https://img.shields.io/badge/Midea-UART%20protocol-2563eb?style=flat-square)
+![Royal Clima](https://img.shields.io/badge/Royal%20Clima-verified-16a34a?style=flat-square)
+![Kentatsu](https://img.shields.io/badge/Kentatsu-verified-16a34a?style=flat-square)
+![Hommyn](https://img.shields.io/badge/Hommyn-Midea%20%2F%20Syncleo-16a34a?style=flat-square)
+![Neoline](https://img.shields.io/badge/Neoline-verified-16a34a?style=flat-square)
+
+</div>
+
+The open-source firmware in this repository is centered on the **Midea UART protocol** and compatible OEM implementations. Exact compatibility still depends on the indoor-unit electronics and UART implementation.
+
+### Universal firmware on flash.pirogovx.ru
+
+<div align="center">
+
+[![Midea](https://img.shields.io/badge/Midea-supported-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![TCL](https://img.shields.io/badge/TCL-supported-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Haier](https://img.shields.io/badge/Haier-SmartAir2%20%2F%20hOn-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Hisense](https://img.shields.io/badge/Hisense-RS--485-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Gree](https://img.shields.io/badge/Gree-supported-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Samsung](https://img.shields.io/badge/Samsung-NASA%20F1%20%2F%20F2-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+
+</div>
+
+The universal ESP32-C6 build on the website can automatically detect supported protocol families. **Exact model and feature coverage may vary**, so use the web installer as the current compatibility reference.
+
+## Choose your path
+
+| I want to... | Recommended path |
+|---|---|
+| Use or modify the open-source Midea UART implementation | **This GitHub repository** |
+| Develop Zigbee2MQTT, ZHA, Matter or UART features | **This GitHub repository** |
+| Flash an ESP32 from the browser | **[flash.pirogovx.ru](https://flash.pirogovx.ru)** |
+| Get the broadest current AC protocol support | **[PirogovX universal firmware](https://flash.pirogovx.ru)** |
+
+## Quick start
+
+1. Open **[flash.pirogovx.ru](https://flash.pirogovx.ru)** in a Chromium-based browser.
+2. Connect the ESP32 by USB and select the board / air-conditioner platform.
+3. Flash the firmware, wire **5V / GND / TX / RX**, and complete the integration setup.
+
+### Supported ESP32 targets
+
+| Board | Main use in the project |
+|---|---|
+| **ESP32-C3** | Wi-Fi / MQTT |
+| **ESP32-C6** | Wi-Fi, Zigbee, Matter, universal multi-protocol builds |
+| **ESP32-H2** | Zigbee Router / Zigbee2MQTT |
+
 ## Why this project exists
 
 Many Midea and Midea-OEM air conditioners expose a local UART interface to the original Wi-Fi module. This project replaces that module with an ESP32 and keeps control local.
