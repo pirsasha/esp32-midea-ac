@@ -1,144 +1,190 @@
-# Royal Clima / Midea AC on ESP32
+<div align="center">
 
-Локальный модуль управления кондиционерами Royal Clima / Midea OEM и совместимыми моделями через внутренний UART кондиционера. Заменяет штатный Wi-Fi модуль и даёт полное локальное управление.
+# PirogovX ESP32 AC Controller
 
-Прошить модуль из браузера можно на сайте:
+### Local control for Midea / Midea OEM air conditioners with ESP32
 
-**[flash.pirogovx.ru](https://flash.pirogovx.ru)** — выбор платы и модели, прошивка в один клик, без установки программ.
+Replace the original Wi-Fi dongle with an ESP32 and control the air conditioner locally through UART, Home Assistant, Zigbee2MQTT, MQTT or Matter.
 
-Проект содержит готовые варианты прошивок:
+[English](README.md) | [Русский](README_RU.md)
 
-- **Wi-Fi ESP32-C6** — WQTT + Алиса, настройка через веб-портал, OTA.
-- **Wi-Fi ESP32-C3** — WQTT + Алиса, настройка через веб-портал, OTA.
-- **Zigbee ESP32-C6** — Zigbee2MQTT / Home Assistant, работает как **роутер**, OTA по воздуху, кнопка сброса.
-- **Zigbee ESP32-H2** — Zigbee2MQTT / Home Assistant, работает как **роутер**, OTA по воздуху, кнопка сброса.
-- **Matter ESP32-C6** — локальная Matter-интеграция.
+[![Web installer](https://img.shields.io/badge/Web%20installer-flash.pirogovx.ru-2563eb?style=for-the-badge)](https://flash.pirogovx.ru)
+[![License](https://img.shields.io/badge/License-Apache%202.0-0f766e?style=for-the-badge)](LICENSE)
+[![ESP32](https://img.shields.io/badge/ESP32-C3%20%7C%20C6%20%7C%20H2-e11d48?style=for-the-badge)](https://www.espressif.com/)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-Local%20control-41BDF5?style=for-the-badge)](https://www.home-assistant.io/)
 
-Все варианты подключаются к UART кондиционера и управляют им напрямую, без родного USB Wi-Fi модуля.
+</div>
 
-## Что работает
+> [!IMPORTANT]
+> **This GitHub repository is not a mirror of every firmware profile available from PirogovX.**
+>
+> The source code here is primarily an open-source reference implementation for **Midea / Midea OEM UART devices**, together with Zigbee, Matter and Wi-Fi examples.
+>
+> For the newest **universal firmware**, broader device compatibility and browser flashing, use **[flash.pirogovx.ru](https://flash.pirogovx.ru)**. The universal ESP32-C6 firmware supports automatic protocol detection for multiple AC platforms, including Midea, TCL, Haier, Hisense RS-485, Gree and Samsung NASA F1/F2.
+>
+> Protocol and model support evolves quickly, so the website should be treated as the current compatibility source.
 
-- Включение и выключение.
-- Режимы: auto, cool, heat, dry, fan only.
-- Установка температуры (шаг 1 °C).
-- Скорость вентилятора: auto, low, medium, high, quiet.
-- Шторки: off, horizontal, vertical, both.
-- Preset: none, sleep, turbo.
-- Управление дисплеем и звуком (beep).
-- Температура внутреннего блока.
-- Температура наружного блока, если кондиционер отдаёт её в UART-статусе.
+## Why this project exists
 
-Wi-Fi версия дополнительно поддерживает:
+Many Midea and Midea-OEM air conditioners expose a local UART interface to the original Wi-Fi module. This project replaces that module with an ESP32 and keeps control local.
 
-- captive portal для первой настройки;
-- WQTT token вместо ручного ввода MQTT;
-- автоматическое создание устройства в WQTT;
-- интеграцию с Алисой через WQTT;
-- OTA и локальную веб-панель;
-- выбор пинов TX/RX/порта из приложения.
+No vendor cloud is required for the basic control path.
 
-Zigbee версия дополнительно:
-
-- работает как **Zigbee Router** (устройство питается от кондиционера, всегда онлайн, ретранслирует сеть и надёжно принимает команды);
-- **OTA-обновление по воздуху** через Zigbee2MQTT — без USB и разбора корпуса;
-- **кнопка сброса**: удержание BOOT (GPIO9) 5 секунд возвращает устройство к заводскому состоянию (выход из сети, готовность к новому спариванию);
-- телеметрия текущей и наружной температуры в Home Assistant.
-
-## Совместимость
-
-Прошивки рассчитаны на кондиционеры с **Midea UART protocol**. Это не только Midea, но и множество OEM-брендов на той же платформе.
-
-Хорошие признаки совместимости:
-
-- Родной модуль похож на **OSK102 / OSK103 / OSK104 / OSK105 / OSK302 / SK10x / SK11x**.
-- В инструкции указано приложение **NetHome Plus**, **Midea Air**, **MSmartHome**, **Hommyn Home** или похожее Midea-приложение.
-- Внутри кондиционера есть USB-A или 4-проводной UART-разъём для Wi-Fi модуля.
-
-Проверенные модели:
-
-- Royal Clima RCI-TWA22HN TRIUMPH.
-- Kentatsu KSGYK35HZRN1 / KSRYK35HZRN1.
-- Kentatsu KSGA26HZRN1.
-- Hommyn (серии на Midea/Syncleo-платформе).
-- Neoline NAM 07HN1.
-
-Потенциально совместимые бренды и линейки:
-
-- Royal Clima.
-- Midea.
-- Hommyn.
-- Neoline.
-- Kentatsu на Midea/OEM платформе.
-- Comfee.
-- Pioneer.
-- Lessar, часть моделей.
-- Marsalle, часть моделей.
-- Electrolux, часть моделей.
-- Carrier, часть моделей.
-- Toshiba/Midea, часть моделей.
-- Cooper&Hunter, часть моделей.
-- Senville / MrCool / Klimaire, часть моделей.
-
-Не подойдут напрямую кондиционеры на других протоколах: Gree / часть Ballu / часть TCL / часть Hisense, Haier, Daikin, Mitsubishi, Hitachi. Для них нужна отдельная реализация протокола.
-
-> Старые модули (некоторые OSK103 / Royal Clima) отвечают только после 7-кратного нажатия кнопки дисплея и используют «legacy» 0x64-хендшейк — для них на сайте есть отдельный вариант прошивки.
-
-## Подключение
-
-Типовая распиновка:
-
-```text
-Кондиционер 5V   -> ESP 5V
-Кондиционер GND  -> ESP GND
-Кондиционер TX   -> ESP RX
-Кондиционер RX   -> ESP TX
+```mermaid
+flowchart LR
+    AC[Air conditioner] <-->|UART| ESP[ESP32]
+    ESP -->|Zigbee| Z2M[Zigbee2MQTT]
+    ESP -->|Wi-Fi / MQTT| MQTT[MQTT]
+    ESP -->|Matter| MATTER[Matter controller]
+    Z2M --> HA[Home Assistant]
+    MQTT --> HA
+    MATTER --> HA
 ```
 
-Если кондиционер не реагирует, но питание есть, сначала поменяйте местами только TX/RX.
+## What is included in this repository
 
-Важно: ESP работает на 3.3V логике. У некоторых кондиционеров UART может быть 5V. Правильнее использовать level shifter хотя бы на линию **TX кондиционера -> RX ESP**.
+Ready-to-build / ready-to-flash variants currently include:
+
+| Variant | Board | Integration | Notes |
+|---|---|---|---|
+| Wi-Fi | ESP32-C6 | MQTT / WQTT | Local web setup, OTA |
+| Wi-Fi | ESP32-C3 | MQTT / WQTT | Local web setup, OTA |
+| Zigbee | ESP32-C6 | Zigbee2MQTT / Home Assistant | Router, OTA, factory reset |
+| Zigbee | ESP32-H2 | Zigbee2MQTT / Home Assistant | Router, OTA, factory reset |
+| Matter | ESP32-C6 | Matter | Local Matter integration |
+
+All variants communicate directly with the air conditioner's internal UART instead of the original USB Wi-Fi module.
+
+## GitHub firmware vs universal PirogovX firmware
+
+| | This GitHub repository | PirogovX universal firmware |
+|---|---|---|
+| Main purpose | Open-source development, protocol research, contributions | Broad end-user compatibility |
+| Main protocol focus | Midea / Midea OEM UART | Multi-protocol |
+| Firmware delivery | Source + files in `release/` | Browser installer |
+| Protocol selection | Build/profile dependent | Automatic detection on supported universal builds |
+| Current broader protocol families | Not all are included here | Midea, TCL, Haier, Hisense RS-485, Gree, Samsung NASA F1/F2 |
+| Best choice for | Developers, contributors, testing | Users who want the widest supported model range |
+
+**Universal installer:** [flash.pirogovx.ru](https://flash.pirogovx.ru)
+
+## Features
+
+- Power on / off
+- HVAC modes: auto, cool, heat, dry, fan only
+- Target temperature
+- Fan speeds: auto, low, medium, high, quiet
+- Horizontal and vertical swing
+- Presets: none, sleep, turbo
+- Display / beep control where supported by the AC firmware
+- Indoor temperature telemetry
+- Outdoor temperature telemetry where exposed by the AC
+- Local operation without the original vendor Wi-Fi module
+- OTA updates on supported builds
+- Zigbee router operation on Zigbee builds
+
+### Wi-Fi builds
+
+Additional features include:
+
+- captive portal for initial setup
+- MQTT / WQTT integration
+- OTA
+- local web interface
+- configurable TX/RX pins on supported builds
+
+### Zigbee builds
+
+Additional features include:
+
+- Zigbee Router mode
+- Zigbee2MQTT integration
+- OTA through Zigbee2MQTT
+- BOOT button factory reset
+- current and outdoor temperature telemetry in Home Assistant
+
+## Compatibility
+
+The source implementation in this repository targets air conditioners using the **Midea UART protocol** and compatible OEM implementations.
+
+Typical compatibility indicators:
+
+- original module is similar to **OSK102 / OSK103 / OSK104 / OSK105 / OSK302 / SK10x / SK11x**
+- the original app is **NetHome Plus**, **Midea Air**, **MSmartHome**, **Hommyn Home** or another Midea-based app
+- the indoor unit has a USB-A or 4-wire UART connector for its Wi-Fi module
+
+Known / tested examples include:
+
+- Royal Clima RCI-TWA22HN TRIUMPH
+- Kentatsu KSGYK35HZRN1 / KSRYK35HZRN1
+- Kentatsu KSGA26HZRN1
+- Hommyn models based on Midea / Syncleo
+- Neoline NAM 07HN1
+
+Many other Midea OEM brands may work as well.
+
+> [!NOTE]
+> Some older OSK103 / Royal Clima implementations require the display button to be pressed seven times before communication is enabled and use a legacy `0x64` handshake. A dedicated firmware profile is available on the web installer.
+
+## Wiring
+
+Typical wiring:
+
+```text
+Air conditioner 5V   -> ESP 5V
+Air conditioner GND  -> ESP GND
+Air conditioner TX   -> ESP RX
+Air conditioner RX   -> ESP TX
+```
+
+> [!WARNING]
+> ESP32 GPIO uses 3.3 V logic. Some air conditioners may expose 5 V UART levels. Use a proper level shifter where required, especially from AC TX to ESP RX.
 
 ### Wi-Fi ESP32-C6
 
 ```text
-ESP GPIO6  = TX к кондиционеру RX
-ESP GPIO7  = RX от кондиционера TX
-UART       = 9600 baud
+GPIO6 = TX -> AC RX
+GPIO7 = RX <- AC TX
+UART  = 9600 baud
 ```
 
 ### Wi-Fi ESP32-C3
 
 ```text
-ESP GPIO20 = TX к кондиционеру RX
-ESP GPIO21 = RX от кондиционера TX
-UART       = 9600 baud
+GPIO20 = TX -> AC RX
+GPIO21 = RX <- AC TX
+UART   = 9600 baud
 ```
-
-В C3 версии консоль ESP-IDF перенесена на USB Serial/JTAG, а UART0 отключён, чтобы GPIO20/GPIO21 не спамили логами в линию кондиционера.
 
 ### Zigbee ESP32-C6
 
 ```text
-ESP GPIO7  = TX к кондиционеру RX
-ESP GPIO6  = RX от кондиционера TX
-UART       = 9600 baud
+GPIO7 = TX -> AC RX
+GPIO6 = RX <- AC TX
+UART  = 9600 baud
 ```
 
 ### Zigbee ESP32-H2
 
 ```text
-ESP GPIO5  = TX к кондиционеру RX
-ESP GPIO8  = RX от кондиционера TX
-UART       = 9600 baud
+GPIO5 = TX -> AC RX
+GPIO8 = RX <- AC TX
+UART  = 9600 baud
 ```
 
-## Готовые прошивки
+## Browser flashing
 
-Готовые файлы лежат в папке `release/`. Проще всего прошивать через сайт:
+The easiest installation path is the PirogovX browser flasher:
 
-**[flash.pirogovx.ru](https://flash.pirogovx.ru)**
+### **[Open flash.pirogovx.ru](https://flash.pirogovx.ru)**
 
-Структура релизов:
+It supports Web Serial in compatible Chromium-based browsers and provides firmware profiles for multiple boards and air conditioner platforms.
+
+The website also contains the broader compatibility database and universal multi-protocol firmware that is **not fully represented by this repository**.
+
+## Release files
+
+Prebuilt files in this repository are located under:
 
 ```text
 release/
@@ -149,160 +195,127 @@ release/
   matter-esp32c6/
 ```
 
-### Zigbee ESP32-C6
-
-Папка: `release/zigbee-esp32c6/`
-
-```powershell
-esptool.py --chip esp32c6 -p COM9 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 2MB 0x0 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 zb_midea_ac.bin
-```
-
-### Zigbee ESP32-H2
-
-Папка: `release/zigbee-esp32h2/`
+Example for Zigbee ESP32-H2:
 
 ```powershell
 esptool.py --chip esp32h2 -p COM11 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 48m --flash_size 2MB 0x0 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 zb_midea_ac.bin
 ```
 
-### Wi-Fi ESP32-C6
-
-Папка: `release/wifi-esp32c6/`
-
-```powershell
-esptool.py --chip esp32c6 -p COM9 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 4MB 0x0 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 ac_wifi_module.bin
-```
-
-### Wi-Fi ESP32-C3
-
-Папка: `release/wifi-esp32c3/`
-
-```powershell
-esptool.py --chip esp32c3 -p COM14 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 4MB 0x0 bootloader.bin 0x8000 partition-table.bin 0xf000 ota_data_initial.bin 0x20000 ac_wifi_module.bin
-```
-
-### Matter ESP32-C6
-
-Папка: `release/matter-esp32c6/`
-
-```powershell
-esptool.py --chip esp32c6 -p COM9 -b 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 80m --flash_size 4MB 0x0 bootloader.bin 0x8000 partition-table.bin 0x10000 ac_matter.bin
-```
-
-Замените `COMx` на свой порт.
-
-## Первичная настройка Wi-Fi версии
-
-1. Прошейте ESP32-C6 или ESP32-C3.
-2. После первой загрузки плата поднимет Wi-Fi точку доступа.
-3. Подключитесь к этой точке с телефона или компьютера.
-4. Введите Wi-Fi сеть, пароль, WQTT token и имя кондиционера.
-5. После сохранения модуль подключится к Wi-Fi, создаст устройство в WQTT и отправит MQTT state.
-6. В Алисе устройство появляется через привязанный WQTT аккаунт.
-
-Пользователь не должен вручную видеть MQTT broker, JSON, YAML или UART-настройки.
+Replace `COM11` with your serial port.
 
 ## Zigbee2MQTT
 
-Устройство определяется как:
+The Zigbee device identifies as:
 
 ```text
 PirogovX / ZB-MIDEA-AC
 ```
 
-Одно определение покрывает обе платы — ESP32-C6 и ESP32-H2.
-
-Поддержка отправлена в официальный репозиторий Zigbee2MQTT — после мержа устройство будет распознаваться **автоматически, без внешнего конвертера** и с фотографией в списке:
-
-- конвертер: [zigbee-herdsman-converters #12918](https://github.com/Koenkk/zigbee-herdsman-converters/pull/12918)
-- картинка: [zigbee2mqtt.io #5414](https://github.com/Koenkk/zigbee2mqtt.io/pull/5414)
-
-До мержа используйте внешний конвертер:
+The external converter is available in the repository:
 
 ```text
-release/zigbee-esp32c6/esp-ac.js   (или release/zigbee-esp32h2/esp-ac.js — они идентичны)
+zigbee2mqtt/esp-ac.js
 ```
 
-Скопируйте его в папку external converters Zigbee2MQTT, например:
+or in the corresponding release directory.
 
-```text
-/config/zigbee2mqtt/external_converters/esp-ac.js
-```
+Relevant upstream submissions:
 
-Перезапустите Zigbee2MQTT и добавьте устройство заново (или нажмите reconfigure).
+- [zigbee-herdsman-converters #12918](https://github.com/Koenkk/zigbee-herdsman-converters/pull/12918)
+- [zigbee2mqtt.io #5414](https://github.com/Koenkk/zigbee2mqtt.io/pull/5414)
 
-### Обновление по воздуху (Zigbee OTA)
+### Zigbee OTA
 
-Zigbee-прошивки поддерживают OTA через Zigbee2MQTT. Один раз добавьте в `configuration.yaml`:
+Example Zigbee2MQTT configuration:
 
 ```yaml
 ota:
-    zigbee_ota_override_index_location: https://flash.pirogovx.ru/firmware/ota-zigbee/index.json
+  zigbee_ota_override_index_location: https://flash.pirogovx.ru/firmware/ota-zigbee/index.json
 ```
 
-Затем в Z2M: вкладка **OTA → Check for new updates → Update**. Устройство обновится и перезагрузится само, переспаривать не нужно.
+Then use **OTA -> Check for new updates -> Update** in Zigbee2MQTT.
 
-## Home Assistant и Алиса
+## ZHA
 
-Wi-Fi версия идёт в Алису через WQTT:
+The current repository is focused on Zigbee2MQTT. Native ZHA device handling is not part of the main implementation yet.
 
-```text
-ESP32 -> Wi-Fi -> WQTT -> Алиса
-```
+ZHA support is a welcome contribution. For true out-of-the-box Home Assistant ZHA support, the final device quirk should also be contributed upstream to `zigpy/zha-device-handlers`.
 
-Matter и Zigbee версии удобнее использовать через локальную инфраструктуру:
-
-```text
-ESP32-C6 Matter          -> Matter controller / Home Assistant
-ESP32-C6 / H2 Zigbee     -> Zigbee2MQTT -> Home Assistant -> Yandex Smart Home
-```
-
-## Что пока не идеально
-
-- Не все OEM-бренды одинаково реализуют swing/display/sound.
-- Для новых моделей может потребоваться поправить Midea UART parser.
-- Температура наружного блока публикуется только если кондиционер реально отдаёт её в статусе.
-- В Matter/Home Assistant часть функций может отображаться отдельными сущностями.
-
-## Безопасность
-
-- Не подключайте ESP напрямую к 220V.
-- Питайте ESP только от штатных 5V кондиционера или безопасного DC-источника.
-- Перед подключением проверьте мультиметром 5V и GND.
-- Не замыкайте TX/RX на питание.
-- Если не уверены в уровнях UART, используйте level shifter.
-
-## Структура проекта
+## Project structure
 
 ```text
 main/
-  main.cpp            - Zigbee logic (ESP32-H2 / C6): router, OTA client, factory reset
+  main.cpp            - Zigbee logic: router, OTA client, factory reset
   midea.cpp / midea.h - Midea UART protocol
   zb_signal_handler.c - Zigbee signal handling
 
 zigbee2mqtt/
-  esp-ac.js           - external converter for Zigbee2MQTT (PirogovX / ZB-MIDEA-AC)
+  esp-ac.js           - Zigbee2MQTT external converter
 
 release/
-  wifi-esp32c6/  wifi-esp32c3/
-  zigbee-esp32c6/  zigbee-esp32h2/   (+ ota/ с .ota-образами)
+  wifi-esp32c6/
+  wifi-esp32c3/
+  zigbee-esp32c6/
+  zigbee-esp32h2/
   matter-esp32c6/
 ```
 
-## Лицензия
+## Contributing
 
-Основной код проекта распространяется по лицензии **Apache License 2.0**.
+Contributions are welcome.
 
-Это означает, что код можно использовать, изменять, распространять и применять
-в коммерческих проектах, включая продажу готовых модулей и устройств, при
-соблюдении условий лицензии и сохранении необходимых уведомлений об авторстве.
+Good candidates include:
 
-Название **PirogovX** и связанные с проектом названия/обозначения не передаются
-по лицензии как торговая марка или бренд. Использовать их можно только в
-обычном описательном смысле, например чтобы указать происхождение проекта.
+- additional Midea / OEM compatibility
+- UART protocol fixes
+- ZHA quirks
+- IR Follow Me support
+- additional hardware testing
+- documentation
+- translations
 
-Полный текст: [LICENSE](LICENSE)
+For larger features, keeping changes in a focused feature branch and opening a separate pull request for each feature makes review and hardware testing easier.
 
-Уведомления об авторстве и использованных open-source проектах:
-[NOTICE](NOTICE) и [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+## Safety
 
+- Never connect the ESP32 directly to mains voltage.
+- Power it only from a verified low-voltage supply.
+- Verify 5 V and GND before wiring.
+- Never short TX/RX to a power rail.
+- Use level shifting if UART voltage levels are uncertain.
+- Disconnect mains power from the air conditioner before installing or removing hardware.
+
+## License
+
+The main project code is licensed under the **Apache License 2.0**.
+
+Commercial use, modification and redistribution are allowed under the terms of the license, including use in commercial hardware modules.
+
+The **PirogovX** project/product name is not licensed as a trademark or commercial brand by the Apache software license.
+
+See:
+
+- [LICENSE](LICENSE)
+- [NOTICE](NOTICE)
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+
+## Credits
+
+The Midea UART implementation was developed with reference to publicly available open-source work, including:
+
+- [midea-msmart](https://github.com/0xbw/midea-msmart)
+- [MideaUART](https://github.com/dudanov/MideaUART)
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution details.
+
+---
+
+<div align="center">
+
+**PirogovX**
+
+Local-first ESP32 integrations for air conditioners and smart home systems.
+
+[Web installer](https://flash.pirogovx.ru) · [Русский README](README_RU.md)
+
+</div>
