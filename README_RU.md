@@ -1,7 +1,7 @@
 <div align="center">
 
-<a href="https://flash.pirogovx.ru">
-  <img src="https://flash.pirogovx.ru/assets/og-image.png" width="100%" alt="PirogovX - Smart devices. Smarter life.">
+<a href="https://pirogovx.ru">
+  <img src="docs/assets/pirogovx-logo-horizontal.webp" width="460" alt="PirogovX">
 </a>
 
 # PirogovX ESP32 AC Controller
