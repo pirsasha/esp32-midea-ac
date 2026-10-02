@@ -380,6 +380,43 @@ release/
   matter-esp32c6/
 ```
 
+## Поддержать проект ❤️
+
+Если PirogovX оказался полезен, можно поддержать дальнейшую разработку, покупку оборудования для тестов, исследование протоколов и добавление новых моделей кондиционеров.
+
+### Поддержать в России
+
+<div align="center">
+
+[![CloudTips](https://img.shields.io/badge/Поддержать-CloudTips-7C3AED?style=for-the-badge&logo=heart&logoColor=white)](https://pay.cloudtips.ru/p/b9d5fc99)
+
+</div>
+
+### Криптовалюта
+
+![USDT TRC20](https://img.shields.io/badge/USDT-TRON%20%2F%20TRC20-26A17B?style=flat-square)
+
+```text
+TU6h4ycD2cALZVTYidQxqigux5ce1swJv6
+```
+
+![USDT TON](https://img.shields.io/badge/USDT-TON-0098EA?style=flat-square)
+
+```text
+UQDhOx70Zg48VI2FzBc_3QvwdwOMXurkzgl8doFUgobpHDdZ
+```
+
+![Bitcoin](https://img.shields.io/badge/Bitcoin-BTC-F7931A?style=flat-square&logo=bitcoin&logoColor=white)
+
+```text
+1Q3koHNsypvvhrpRfSDxFZWAN3nwYRXuHt
+```
+
+> [!IMPORTANT]
+> Перед отправкой обязательно проверьте **монету и сеть**. Криптовалютные транзакции необратимы. Эти адреса предназначены только для добровольной поддержки проекта.
+
+Спасибо всем, кто помогает тестировать новое оборудование и развивать PirogovX. ❤️
+
 ## Лицензия
 
 Основной код проекта распространяется по лицензии **Apache License 2.0**.
