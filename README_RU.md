@@ -43,6 +43,60 @@
 >
 > Поддержка моделей и протоколов развивается быстрее, чем этот репозиторий, поэтому актуальную матрицу совместимости лучше проверять на сайте.
 
+## Совместимость с первого взгляда
+
+### Этот репозиторий: Midea UART / Midea OEM
+
+<div align="center">
+
+![Midea UART](https://img.shields.io/badge/Midea-UART%20protocol-2563eb?style=flat-square)
+![Royal Clima](https://img.shields.io/badge/Royal%20Clima-проверено-16a34a?style=flat-square)
+![Kentatsu](https://img.shields.io/badge/Kentatsu-проверено-16a34a?style=flat-square)
+![Hommyn](https://img.shields.io/badge/Hommyn-Midea%20%2F%20Syncleo-16a34a?style=flat-square)
+![Neoline](https://img.shields.io/badge/Neoline-проверено-16a34a?style=flat-square)
+
+</div>
+
+Открытая прошивка в этом репозитории ориентирована прежде всего на **Midea UART** и совместимые OEM-реализации. Точная совместимость всё равно зависит от электроники конкретного внутреннего блока и реализации UART.
+
+### Универсальная прошивка на flash.pirogovx.ru
+
+<div align="center">
+
+[![Midea](https://img.shields.io/badge/Midea-поддержка-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![TCL](https://img.shields.io/badge/TCL-поддержка-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Haier](https://img.shields.io/badge/Haier-SmartAir2%20%2F%20hOn-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Hisense](https://img.shields.io/badge/Hisense-RS--485-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Gree](https://img.shields.io/badge/Gree-поддержка-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+[![Samsung](https://img.shields.io/badge/Samsung-NASA%20F1%20%2F%20F2-0f766e?style=flat-square)](https://flash.pirogovx.ru)
+
+</div>
+
+Универсальная сборка ESP32-C6 на сайте умеет автоматически определять поддерживаемые семейства протоколов. **Набор функций может отличаться в зависимости от конкретной модели**, поэтому актуальную совместимость лучше проверять через веб-установщик.
+
+## Что выбрать
+
+| Задача | Куда идти |
+|---|---|
+| Изучить или изменить открытую реализацию Midea UART | **Этот GitHub-репозиторий** |
+| Разрабатывать Zigbee2MQTT, ZHA, Matter или UART | **Этот GitHub-репозиторий** |
+| Прошить ESP32 прямо из браузера | **[flash.pirogovx.ru](https://flash.pirogovx.ru)** |
+| Нужна самая широкая текущая поддержка кондиционеров | **[Универсальная прошивка PirogovX](https://flash.pirogovx.ru)** |
+
+## Быстрый старт
+
+1. Откройте **[flash.pirogovx.ru](https://flash.pirogovx.ru)** в Chromium-браузере.
+2. Подключите ESP32 по USB и выберите плату / платформу кондиционера.
+3. Прошейте модуль, подключите **5V / GND / TX / RX** и настройте нужную интеграцию.
+
+### Поддерживаемые платы ESP32
+
+| Плата | Основное применение |
+|---|---|
+| **ESP32-C3** | Wi-Fi / MQTT |
+| **ESP32-C6** | Wi-Fi, Zigbee, Matter, универсальные multi-protocol сборки |
+| **ESP32-H2** | Zigbee Router / Zigbee2MQTT |
+
 Проект содержит готовые варианты прошивок:
 
 - **Wi-Fi ESP32-C6** — WQTT + Алиса, настройка через веб-портал, OTA.
